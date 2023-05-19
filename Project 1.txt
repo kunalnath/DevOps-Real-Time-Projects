@@ -1,0 +1,104 @@
+Deploying Application into Tomcat Server by using CICD Pipeline using declarative pipeline.
+
+Steps:
+
+- Install git, java, jenkins.
+- Start the Jenkins service.
+- Setup Jenkins in Global Tool Conf (Git, Maven[name: mymaven, install automatically])
+- Create a Pipeline Job
+- Write Jenkins file:
+
+pipeline{
+	agent any
+	tools{
+		maven 'mymaven'
+	}
+	stages{
+		stage('CloneRepo'){
+			steps{
+				git 'repo url'
+			}
+		}
+		stage('Compile'){
+			steps{
+				sh 'mvn compile'
+			}
+		}
+		stage ('CodeReview'){
+            	steps{
+             		sh  'mvn pmd:pmd'
+            	}
+           		post{
+                		success{
+                    		recordIssues(tools: [pmdParser(pattern: '**/pmd.xml')])
+                		}
+            	}
+        	}
+        	stage ('Test'){
+            	steps{
+                		sh  'mvn test'
+            	}
+			post{
+            		success{
+                			junit 'target/surefire-reports/*.xml'
+            		}
+        		}
+        	}	
+ 		stage('package'){
+            	steps{
+                		sh 'mvn package'
+            	}
+        	}
+		// Stage for deployment goes here ***
+	}	
+}
+
+Setup for Tomcat:
+
+- Install java, tomcat.
+- Start tomcat and Access tomcat.
+- Edit the context.xml file so as to access manager app:
+	- /opt/tomcat/webapps/host-manager/META-INF/context.xml ( comment valve )
+	- /opt/tomcat/webapps/manager/META-INF/context.xml ( comment valve )
+- Restart tomcat.
+- Create roles and users in tomcat-users.xml:
+	-	<role rolename="manager-gui"/>
+		<role rolename="manager-script"/>
+		<role rolename="manager-jmx"/>
+		<role rolename="manager-status"/>
+		<user username="admin" password="admin" roles="manager-gui, manager-script, manager-jmx, manager-status"/>
+		<user username="deployer" password="deployer" roles="manager-script"/>
+		<user username="tomcat" password="s3cret" roles="manager-gui"/>
+- Restart tomcat.
+- Access Manager App , enter username and password.
+
+Manual Deployment Setup:
+
+- Download a plugin : Deploy to container in Jenkins.
+- Create a Deployment Freestyle Job.
+- Give repo name, Go to Build steps - Invoke top level maven targets (name- mymaven, Goal : clean install package)
+- Go to Post build actions - select deploy war/ear on container.
+- WAR/EAR files : **/*.war
+- Containers: click on add container--> select Tomcat 8.x Remote
+- Add credentials: Click on ADD button → jenkins → Username: deployer , password = deployerId = tomcat, description = tomcat
+- Tomcat URL: http://publicip:8080/
+- You can access the application from : http://publicip:8080/addressbook/
+
+Deployment through Jenkins file:
+
+- Get the path in which war gets created, ex: /var/lib/jenkins/workspace/CI_CDPipeline/target/addressbook.war (after building the code)
+- Add the below stage for deployment:
+
+// Stage for deployment **
+stage('Deploy the code on tomcat server')
+	{
+            steps{
+                sshagent(['tomcatid1']) {
+                    
+     			sh 'scp  -o StrictHostKeyChecking=no (while connecting no need host key checking) filenamelocation username@publicip:Destinationpath'
+
+			}
+            }
+      }
+
+- Just execute this command on tomcat server: chown -R ec2-user:ec2-user /opt
