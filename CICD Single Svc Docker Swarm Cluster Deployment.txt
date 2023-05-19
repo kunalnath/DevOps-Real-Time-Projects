@@ -1,0 +1,73 @@
+Jenkins-DockerSwarm Project Flow:
+
+Agenda: CI/CD Pipeline Script to build and deploy single service in docker swarm
+
+Steps:
+
+1. Setup the Docker-Swarm Cluster ( Master Node and 2 Worker Nodes )
+2. Create EC2 Instances ( Jenkins Server ) [Enable port 8080]
+3. Install Java, Jenkins, Docker in Jenkins Server.
+4. sudo usermod -aG docker jenkins (Add Jenkins user to docker group)
+5. sudo systemctl restart jenkins (Restart the Jenkins)
+6. Login to Jenkins Dashboard
+7. Configure Maven: Go to Global Tool Configuration:
+	- Add maven: Enter name as 'mymaven'
+8. Create a Jenkins Pipeline Job
+9. Write the Pipeline script (Declarative pipeline):
+
+pipeline{
+	agent any
+	tools{
+		maven 'mymaven'
+	}
+	stages{
+		stage("Clone Code"){
+			steps{
+				git '<git_repo>'
+			}
+		}
+		stage("Build Code"){
+			steps{
+				sh 'mvn clean install'
+			}
+		}
+		stage("Build Docker Image"){
+			steps{
+				sh 'cp /var/lib/jenkins/workspace/CI_CDPipeline/target/java-web-app.war .'
+				sh 'docker build -t image:$BUILDNUMBER .'
+			}
+		}
+/* 
+	Go to Snippet Generator, select 'with credentials':
+	Add Bindings---> Select 'Secret text'---> Add Credentials:
+	Enter Docker Password in Secret, Enter ID and Description---> Add
+	Enter Variable "DockerHubPwd" (can be anything)
+*/ 
+
+		stage("Login Docker and Push Docker Image"){
+			steps{
+				withCredentials(){
+					sh 'docker login -u <usr_name> -p ${DockerHubPwd}'
+				}
+				sh 'docker push image:$BUILDNUMBER'	
+			}
+		}
+/*
+	Download and Install SSH Agent plugin
+	Go to Snippet Generator, select 'SSH Agent':
+	Select 'SSH Username and private key'
+	Add Jenkins:
+	Enter ID, username, private key
+*/
+		stage("Deploy Application to Docker Swarm Cluster"){
+			steps{
+				sshagent(){
+					sh 'ssh -o StrictHostKeyChecking=no ec2-user@<private_ip of Docker Master> docker service rm <Service_Name> || true'
+					sh 'ssh -o StrictHostKeyChecking=no ec2-user@<private_ip of Docker Master> docker service create -d -p 8080:8080 --name <Service_Name> --replicas 2 image:$BUILDNUMBER'
+				}
+			}
+		}
+	}
+}
+
+

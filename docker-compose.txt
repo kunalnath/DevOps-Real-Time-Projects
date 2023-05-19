@@ -1,0 +1,33 @@
+version: '3'
+services:
+	springboot:
+		image: image:$BUILDNUMBER:latest
+		restart: always
+		container_name: springboot
+		ports:
+			- 9090:8080
+		working_dir: /opt/app
+		depends_on:
+			- mongo
+		deploy:
+			replicas: 2
+			update_config:
+				paralleslism: 1
+				delay: 28s
+			restart_policy:
+				condition: on_failure
+	mongo:
+		image: mongo
+		restart: always
+		container_name: springboot-mongo
+		volumes:
+			- data:/data/db
+			- data-bkp:/data/bkp
+	volumes:
+		data:
+		data_bkp:
+
+	networks:
+		default:
+			external:
+				name: customoverlay

@@ -1,0 +1,76 @@
+Topic: CICD Pipeline scripts to build and deploy Docker images from Jenkins into Kubernetes Cluster
+
+Steps:
+
+1. Create EC2 Instance ( Jenkins Server ) [Enable port 8080]
+2. Install Java, Jenkins, Docker in Jenkins Server.
+3. sudo usermod -aG docker jenkins ( Add Jenkins user to docker group )
+4. sudo systemctl restart jenkins ( Restart the Jenkins )
+5. Setup K8S Cluster ( Master and Worker nodes ) and install docker
+7. sudo usermod -aG docker ubuntu/ec2-user (Add ubuntu/ec2-user to docker group) and restart docker
+8. Login to Jenkins Dashboard and install plugin: "Kubernetes Continuous Deploy Plugin" to deploy into kubernetes cluster
+Need to download kubernetes-cd.hpi in local m/c and download it in Jenkins
+Need to add credentials (kube-config) for Jenkins to connect to Kubernetes
+9. Configure Maven: Go to Global Tool Configuration:
+	- Add maven: Enter name as 'mymaven'
+10. Create a Jenkins Pipeline Job
+11. Write the Pipeline script (Declarative pipeline):
+
+pipeline{
+	agent any
+	tools{
+		maven 'mymaven'
+	}
+	stages{
+		stage('Clone Code'){
+			steps{
+				git '<git_repo>'
+			}	
+		}
+		stage('Build Code'){
+			steps{
+				sh 'mvn clean install'
+			}
+		}
+		stage('Build Docker Image'){
+			steps{
+				sh 'cp /var/lib/jenkins/workspace/CI_CDPipeline/target/java-web-app.war .'
+				sh 'docker build -t image:$BUILD_NUMBER .'
+			}
+		}
+/* 
+	Go to Snippet Generator, select 'with credentials':
+	Add Bindings---> Secret text---> Add Credentials:
+	Enter Docker Password in Secret, Enter ID and Description---> Add
+	Enter Variable "DockerHubPwd" (can be anything)
+*/ 
+		stage('Login Docker and push Docker Image'){
+			steps{
+				withCredentials(){
+					sh 'docker login -u <usr_name> -p ${DockerHubPwd}'
+				}
+				sh 'docker push image:$BUILD_NUMBER'	
+			}
+		}
+/*
+	Download and Install Kubernetes Continuous Deploy ( To connect Jenkins with Kubernetes Cluster )
+	Credentials---> Add credentials (Stores scoped to Jenkins):
+	Select Kubernetes configuration (kubeconfig): Enter ID(**) and Description
+	Go to K8S Master, cat .kube/config (kube config file consists of info like kubernetes master machine ip and credentials to connect to master machine)
+	Copy complete content and paste it to Kubeconfig(Enter directly)---> Save
+*/
+		stage('Deployment App in K8S Cluster'){
+			steps{
+				kubernetesDeploy(
+					configs: '<Manifest_file_name.yml>'
+					kubeconfigId: 'ID(**)'
+					enableConfigSubstitution: true
+				)
+			}
+		}
+	}
+}
+
+Now to access Application: <Public_Ip of K8S Master Node>:<Node_port>
+
+Second Approach??
