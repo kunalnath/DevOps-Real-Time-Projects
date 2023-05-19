@@ -1,0 +1,80 @@
+Steps:
+
+a. Setup on Node Server (Linux):
+
+- Create an EC2 Instance, install java, git.
+- Create a root directory (which is to be accessed by Master): 
+	- cd /tmp
+	- mkdir jenkinsdir
+- Give read/write/execute access to it (Jenkins User):
+	- chmod -R 777 /tmp/jenkinsdir
+
+b. Setup on Jenkins master:
+
+	- Manage jenkins → Configure system → Scroll down to jenkins location and change the Jenkins URL to be the latest URL: http://3.147.195.251(Public_ip of Instance):8080/
+	- Manage Jenkins → Manage nodes and Clouds:
+	- Add New Node: Give node name: slave1 - Select Permanent Agent
+		- Number of executors: 1(eg.) - ( Executors means Parellel jobs that can be dispatched to the nodes )
+		- Remote root directory: /tmp/jenkinsdir
+		- Labels : slave1 ( Labels is just a tag or alias name which is used to dispatch the jobs selectively to the node)
+		- Usage : select second option from dropdown ( which ever job has this label will be dispatched to this node )
+		- Launch method: launch agents via ssh
+		- Host : private ip address of slave machine
+		- Add Jenkins Credentials:
+			- Kind: SSH Username with private key
+			- Give Id and Desc.
+			- Username: ec2_user (username of the ec2_Instance)
+			- Enter the private key (pem file)
+		- Host key verifying Strategy: Non verifying Verification Strategy
+		--------------------------------------(Master will connect to the Node)-------------------------------------------
+
+- Dispatch the Job to the Node server:
+	- Go to Job Configure section:
+		- Check "Restrict where this project can be run" - Mention the Label expression
+
+Adding the agent on the pipeline code:
+
+pipeline{
+	agent {label '<label_name>'}
+}
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+a. Setup on Node Server (Windows):
+
+- Git, Java should be installed in the Windows system.
+- Create a remote root directory (which is to be accessed by Master): 
+	- Go inside C:\
+	- Create a folder jenkinsdir
+
+b. Setup on Jenkins master:
+
+	- Manage jenkins → Configure system → Scroll down to jenkins location and change the Jenkins URL to be the latest URL: http://3.147.195.251(Public_ip of Instance):8080/
+	- Open the Agent port:
+		- Manage Jenkins - Configure Global Security - Select "TCP Portfor inbound agents" RANDOM (only in the case of Windows Agent)
+	- Manage Jenkins → Manage nodes and Clouds:
+	- Add New Node: Give node name: slave1 - Select Permanent Agent
+		- Number of executors: 1(eg.) - ( Executors means Parellel jobs that can be dispatched to the nodes )
+		- Remote root directory: C:\jenkinsdir
+		- Labels : slave1 ( Labels is just a tag or alias name which is used to dispatch the jobs selectively to the node)
+		- Usage : select second option from dropdown ( which ever job has this label will be dispatched to this node )
+		- Launch method: launch agents by connecting it to the controller
+		- Host : private ip address of slave machine
+		- Add Jenkins Credentials:
+			- Kind: SSH Username with private key
+			- Give Id and Desc.
+			- Username: ec2_user (username of the ec2_Instance)
+			- Enter the private key (pem file)
+		- Host key verifying Strategy: Non verifying Verification Strategy
+		- Scroll down to Node properties
+		- Select tool location:
+			- Add the Git path (Under Program Files)and Java path (not required)
+			(make sure JDK and Git configurations are done in Global Tool Configuration)
+
+		- Manage Jenkins → Manage nodes and Clouds - Click on the Agent - Download the jar file
+		- Cut and paste the jar file from Downloads to C:\jenkinsdir
+		- On windows agent, in CMD prompt, run the mentioned commands inside C:\jenkinsdir (for connection between agent and master)
+
+- Dispatch the Job to the Node server:
+	- Go to Job Configure section:
+		- Check "Restrict where this project can be run" - Mention the Label expression
